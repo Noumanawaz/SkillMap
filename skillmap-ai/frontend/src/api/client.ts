@@ -4,21 +4,30 @@ const API_BASE = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? "" : "http://localhost:8000");
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  // Read the response body once as text
+  const text = await res.text();
+  
   if (!res.ok) {
     let errorMessage = `Request failed: ${res.status}`;
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch {
-      errorMessage = await res.text() || errorMessage;
+    // Try to parse as JSON for structured error messages
+    if (text) {
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+      } catch {
+        // If not JSON, use the text as error message
+        errorMessage = text || errorMessage;
+      }
     }
     throw new Error(errorMessage);
   }
+  
   // Handle empty responses (e.g., DELETE with no body)
-  const text = await res.text();
   if (!text) {
     return {} as T;
   }
+  
+  // Try to parse as JSON, fallback to text
   try {
     return JSON.parse(text) as T;
   } catch {
