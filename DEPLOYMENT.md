@@ -1,35 +1,48 @@
 # Deployment Guide for Coolify
 
-This guide will help you deploy SkillMap AI to Coolify with a single-click deployment.
+This guide will help you deploy SkillMap AI to Coolify using pre-built Docker images.
 
 ## Prerequisites
 
-1. A GitHub repository with your code
+1. Docker Hub account (username: `nomi2k4`)
 2. A Coolify instance set up
 3. OpenAI API key (for AI features)
 
 ## Quick Deployment Steps
 
-### 1. Push to GitHub
+### Option 1: Build and Push Images Manually
 
-Make sure all files are committed and pushed to your GitHub repository:
+1. **Build and push Docker images to Docker Hub:**
 
 ```bash
-git add .
-git commit -m "Add Docker deployment files"
-git push origin main
+# Make sure you're logged into Docker Hub
+docker login
+
+# Run the build script
+./build-and-push.sh
 ```
 
-### 2. Setup in Coolify
+This will build and push both backend and frontend images to `nomi2k4/skillmap-backend:latest` and `nomi2k4/skillmap-frontend:latest`.
+
+### Option 2: Automatic Builds with GitHub Actions
+
+1. **Set up GitHub Secrets:**
+   - Go to your GitHub repository → Settings → Secrets and variables → Actions
+   - Add these secrets:
+     - `DOCKER_USERNAME`: `nomi2k4`
+     - `DOCKER_PASSWORD`: Your Docker Hub password or access token
+
+2. **Push to GitHub:**
+   - The GitHub Actions workflow will automatically build and push images on every push to `main` branch
+
+### 3. Deploy in Coolify
 
 1. **Create New Resource** in Coolify
-2. **Select "Docker Compose"** as the deployment type
-3. **Connect GitHub Repository**:
-   - Authorize Coolify to access your GitHub
-   - Select your repository
-   - Select the branch (usually `main` or `master`)
+2. **Select "Docker Compose Empty"** (under Docker Based section)
+3. **Paste your docker-compose.yml:**
+   - The file is already configured to use pre-built images: `nomi2k4/skillmap-backend:latest` and `nomi2k4/skillmap-frontend:latest`
 
-4. **Configure Environment Variables**:
+4. **Configure Environment Variables:**
    Click on "Environment Variables" and add:
    
    ```
@@ -40,10 +53,10 @@ git push origin main
    **Note**: For production, it's recommended to use PostgreSQL. Coolify can create a PostgreSQL database for you.
 
 5. **Deploy**:
-   - Coolify will automatically detect the `docker-compose.yml` file
-   - Click "Deploy" and wait for the build to complete
+   - Click "Deploy" and wait for the services to start
+   - No build time needed since images are pre-built!
 
-### 3. Database Setup (PostgreSQL Recommended)
+### 4. Database Setup (PostgreSQL Recommended)
 
 If using PostgreSQL:
 
@@ -54,7 +67,7 @@ If using PostgreSQL:
    DATABASE_URL=postgresql://user:password@postgres-service:5432/skillmap
    ```
 
-### 4. Access Your Application
+### 5. Access Your Application
 
 Once deployed:
 - Frontend will be available at your Coolify domain (port 80)
@@ -104,10 +117,16 @@ The deployment uses Docker Compose with two services:
 
 ## Updating the Application
 
-Simply push new changes to GitHub, and Coolify will automatically:
-1. Pull the latest code
-2. Rebuild Docker images
-3. Redeploy the services
+### Manual Update:
+1. Make your code changes
+2. Build and push new images: `./build-and-push.sh`
+3. In Coolify, restart the services or pull the latest images
+
+### Automatic Update (with GitHub Actions):
+1. Push changes to GitHub
+2. GitHub Actions automatically builds and pushes new images
+3. In Coolify, restart services to pull the latest images
+4. (Optional) Set up Coolify webhooks to auto-restart on image updates
 
 ## Health Checks
 

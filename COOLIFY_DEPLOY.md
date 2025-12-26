@@ -1,23 +1,28 @@
 # 🚀 Coolify Deployment - Quick Start
 
-Deploy SkillMap AI to Coolify in 3 simple steps!
+Deploy SkillMap AI to Coolify using pre-built Docker images!
 
-## Step 1: Push to GitHub
+## Step 1: Build and Push Docker Images
 
+**Option A: Manual Build**
 ```bash
-git add .
-git commit -m "Add Docker deployment configuration"
-git push origin main
+# Login to Docker Hub
+docker login
+
+# Build and push images
+./build-and-push.sh
 ```
+
+**Option B: Automatic Build (GitHub Actions)**
+1. Set GitHub Secrets: `DOCKER_USERNAME` and `DOCKER_PASSWORD`
+2. Push to GitHub - images build automatically!
 
 ## Step 2: Setup in Coolify
 
 1. **Go to Coolify Dashboard** → Create New Resource
-2. **Select "Docker Compose"**
-3. **Connect GitHub**:
-   - Authorize Coolify
-   - Select your repository
-   - Select branch (usually `main`)
+2. **Select "Docker Compose Empty"** (under Docker Based section)
+3. **Paste docker-compose.yml**:
+   - The file is already configured with images: `nomi2k4/skillmap-backend:latest` and `nomi2k4/skillmap-frontend:latest`
 4. **Add Environment Variables**:
    ```
    OPENAI_API_KEY=sk-your-actual-key-here
@@ -27,8 +32,8 @@ git push origin main
 
 ## Step 3: Done!
 
-Coolify will automatically:
-- ✅ Build Docker images
+Coolify will:
+- ✅ Pull pre-built Docker images (no build time!)
 - ✅ Start both services (backend + frontend)
 - ✅ Set up networking
 - ✅ Enable health checks
