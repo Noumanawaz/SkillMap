@@ -29,6 +29,7 @@ def list_employees(db: Session = Depends(get_db)):
             employee_id=str(emp.employee_id),
             email=emp.email,
             name=emp.name,
+            description=emp.description,
             role_id=str(emp.role_id) if emp.role_id else None,
             manager_id=str(emp.manager_id) if emp.manager_id else None,
             hire_date=emp.hire_date,
