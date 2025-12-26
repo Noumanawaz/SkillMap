@@ -6,7 +6,8 @@ services:
       context: ./skillmap-ai/backend
       dockerfile: Dockerfile
     container_name: skillmap-backend
-    # No port mapping - Coolify routes via internal network
+    expose:
+      - "8000"
     environment:
       - DATABASE_URL=${DATABASE_URL:-sqlite:///./skillmap.db}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -35,7 +36,8 @@ services:
       args:
         - VITE_API_URL=
     container_name: skillmap-frontend
-    # No port mapping - Coolify routes via internal network
+    expose:
+      - "80"
     depends_on:
       backend:
         condition: service_healthy
