@@ -16,7 +16,15 @@ class LLMService:
     def __init__(self):
         self.settings = get_settings()
         if not self.settings.openai_api_key:
-            raise ValueError("OPENAI_API_KEY not set in environment")
+            import os
+            env_key = os.getenv("OPENAI_API_KEY")
+            error_msg = "OPENAI_API_KEY not set in environment. Please set it in Coolify Environment Variables section."
+            print(f"❌ {error_msg}")
+            print(f"   Settings.openai_api_key: {'Set' if self.settings.openai_api_key else 'Not set'}")
+            print(f"   Environment OPENAI_API_KEY: {'Set' if env_key else 'Not set'}")
+            if env_key:
+                print(f"   Value preview: {env_key[:7]}...{env_key[-4:] if len(env_key) > 11 else '***'}")
+            raise ValueError(error_msg)
         try:
             import os
             # Set environment variable for OpenAI client

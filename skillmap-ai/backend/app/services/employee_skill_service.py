@@ -31,8 +31,16 @@ class EmployeeSkillService:
             return {"extracted_skills": 0, "message": "No description provided"}
 
         if not self.llm:
-            error_msg = "OpenAI API key not configured. Skills cannot be extracted automatically."
+            import os
+            from app.core.config import get_settings
+            settings = get_settings()
+            env_key = os.getenv("OPENAI_API_KEY")
+            error_msg = "OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables (Coolify: Environment Variables section)."
             print(f"❌ {error_msg}")
+            print(f"   Settings.openai_api_key: {'Set' if settings.openai_api_key else 'Not set'}")
+            print(f"   Environment variable OPENAI_API_KEY: {'Set' if env_key else 'Not set'}")
+            if env_key:
+                print(f"   Value preview: {env_key[:7]}...{env_key[-4:] if len(env_key) > 11 else '***'}")
             return {
                 "extracted_skills": 0,
                 "message": error_msg,

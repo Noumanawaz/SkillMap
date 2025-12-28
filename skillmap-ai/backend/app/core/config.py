@@ -44,12 +44,22 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Also check environment variables directly as fallback
+        # Also check environment variables directly as fallback (for Coolify/Docker deployments)
         if not self.openai_api_key:
             self.openai_api_key = os.getenv("OPENAI_API_KEY")
+            if self.openai_api_key:
+                print(f"✅ OPENAI_API_KEY loaded from environment variable")
+            else:
+                print(f"⚠️  OPENAI_API_KEY not found in environment variables")
+                # Debug: show what env vars are available (without exposing values)
+                openai_vars = [k for k in os.environ.keys() if 'OPENAI' in k.upper() or 'AI' in k.upper()]
+                if openai_vars:
+                    print(f"   Found related env vars: {', '.join(openai_vars)}")
+                else:
+                    print(f"   No OpenAI-related environment variables found")
 
 
 # Don't cache settings to ensure .env changes are picked up

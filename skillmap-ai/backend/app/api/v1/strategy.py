@@ -185,7 +185,7 @@ def extract_skills_for_goal(goal_id: str, db: Session = Depends(get_db)):
         if "not available" in str(e) or "OPENAI_API_KEY" in str(e):
             raise HTTPException(
                 status_code=400,
-                detail="OpenAI API key not configured. Please set OPENAI_API_KEY in .env file."
+                detail="OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables (Coolify: Environment Variables section)."
             )
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
