@@ -275,3 +275,44 @@ def get_employee_skills(employee_id: str, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/{employee_id}/extract-skills")
+def extract_employee_skills(employee_id: str, db: Session = Depends(get_db)):
+    """Manually trigger skill extraction from employee description."""
+    try:
+        emp = db.get(EmployeeProfile, UUID(employee_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid employee ID")
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    if not emp.description or not emp.description.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="Employee has no description. Please add a description first."
+        )
+    
+    try:
+        skill_service = EmployeeSkillService(db)
+        result = skill_service.extract_and_store_skills(str(emp.employee_id), emp.description)
+        
+        if result.get("extracted_skills", 0) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Failed to extract skills. Please check OpenAI API key configuration.")
+            )
+        
+        return {
+            "employee_id": employee_id,
+            "employee_name": emp.name,
+            "extracted_skills": result.get("extracted_skills", 0),
+            "message": result.get("message", "Skills extracted successfully"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to extract skills: {str(e)}"
+        )
+
+
