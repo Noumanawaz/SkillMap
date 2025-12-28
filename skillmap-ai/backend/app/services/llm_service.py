@@ -18,24 +18,46 @@ class LLMService:
         if not self.settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY not set in environment")
         try:
-            # Initialize OpenAI client with explicit api_key parameter
-            # OpenAI v2.x supports this directly
-            self.client = OpenAI(api_key=self.settings.openai_api_key)
-        except ImportError as import_error:
-            raise ValueError(f"OpenAI library not installed: {import_error}")
-        except TypeError as type_error:
-            error_msg = str(type_error)
-            # If there's still an issue, try using environment variable
             import os
+            # Set environment variable for OpenAI client
             original_key = os.environ.get("OPENAI_API_KEY")
             os.environ["OPENAI_API_KEY"] = self.settings.openai_api_key
+            
             try:
+                # Initialize OpenAI client - OpenAI v1.x doesn't support 'proxies' parameter
+                # Use environment variable approach to avoid any proxy-related issues
                 self.client = OpenAI()
+            except TypeError as type_error:
+                error_msg = str(type_error)
+                # If error mentions 'proxies', it might be from environment config
+                if "proxies" in error_msg.lower():
+                    # Try with explicit api_key and no other parameters
+                    try:
+                        # Clear any proxy-related env vars temporarily
+                        proxy_vars = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"]
+                        saved_proxies = {}
+                        for var in proxy_vars:
+                            if var in os.environ:
+                                saved_proxies[var] = os.environ[var]
+                                del os.environ[var]
+                        
+                        # Try initialization again
+                        self.client = OpenAI(api_key=self.settings.openai_api_key)
+                        
+                        # Restore proxy vars
+                        for var, value in saved_proxies.items():
+                            os.environ[var] = value
+                    except Exception:
+                        # If that fails, try without api_key parameter
+                        self.client = OpenAI()
+                else:
+                    raise
             finally:
+                # Restore original key if it existed
                 if original_key is not None:
                     os.environ["OPENAI_API_KEY"] = original_key
-                elif "OPENAI_API_KEY" in os.environ:
-                    del os.environ["OPENAI_API_KEY"]
+        except ImportError as import_error:
+            raise ValueError(f"OpenAI library not installed: {import_error}")
         except Exception as e:
             # Handle OpenAI client initialization errors
             raise ValueError(f"Failed to initialize OpenAI client: {e}")
