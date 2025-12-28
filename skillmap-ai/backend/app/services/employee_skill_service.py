@@ -31,12 +31,16 @@ class EmployeeSkillService:
             return {"extracted_skills": 0, "message": "No description provided"}
 
         if not self.llm:
+            error_msg = "OpenAI API key not configured. Skills cannot be extracted automatically."
+            print(f"❌ {error_msg}")
             return {
                 "extracted_skills": 0,
-                "message": "OpenAI API key not configured. Skills cannot be extracted automatically.",
+                "message": error_msg,
             }
 
         try:
+            print(f"🔍 Starting skill extraction for employee {employee_id}...")
+            print(f"   Description length: {len(description)} characters")
             # Get existing skills for context
             existing_skills = self.db.query(Skill).limit(100).all()
             skills_context = [
@@ -44,14 +48,18 @@ class EmployeeSkillService:
             ]
 
             # Extract skills using LLM
+            print(f"   Calling LLM to extract skills...")
             extracted_skills_data = self.llm.extract_skills_from_description(
                 description, skills_context
             )
+            print(f"   LLM returned {len(extracted_skills_data) if extracted_skills_data else 0} skills")
 
             if not extracted_skills_data:
+                error_msg = "No skills could be extracted from the description. The LLM did not return any skills."
+                print(f"⚠️  {error_msg}")
                 return {
                     "extracted_skills": 0,
-                    "message": "No skills could be extracted from the description.",
+                    "message": error_msg,
                 }
 
             # Get employee
@@ -64,33 +72,52 @@ class EmployeeSkillService:
 
             # Match or create skills and add to profile
             matched_count = 0
-            for skill_data in extracted_skills_data:
-                # Try to match to existing skill
-                matched_skill = self._match_or_create_skill(skill_data)
-                if matched_skill:
-                    skill_id = str(matched_skill.skill_id)
-                    proficiency = skill_data.get("proficiency_level", 3)
+            for idx, skill_data in enumerate(extracted_skills_data, 1):
+                try:
+                    skill_name = skill_data.get("name", "Unknown")
+                    print(f"   Processing skill {idx}/{len(extracted_skills_data)}: {skill_name}")
                     
-                    # Initialize skill in cognitive profile if not present
-                    if skill_id not in profile:
-                        profile[skill_id] = {
-                            "theta": float(proficiency - 3) * 0.5,  # Convert 1-5 to approximate theta
-                            "alpha": 1.0,
-                            "level": float(proficiency),
-                        }
+                    # Try to match to existing skill
+                    matched_skill = self._match_or_create_skill(skill_data)
+                    if matched_skill:
+                        skill_id = str(matched_skill.skill_id)
+                        proficiency = skill_data.get("proficiency_level", 3)
+                        
+                        # Initialize skill in cognitive profile if not present
+                        if skill_id not in profile:
+                            profile[skill_id] = {
+                                "theta": float(proficiency - 3) * 0.5,  # Convert 1-5 to approximate theta
+                                "alpha": 1.0,
+                                "level": float(proficiency),
+                            }
+                            print(f"      ✅ Added skill: {matched_skill.name} (level {proficiency})")
+                        else:
+                            # Update level if higher
+                            current_level = profile[skill_id].get("level", 0)
+                            if proficiency > current_level:
+                                profile[skill_id]["level"] = float(proficiency)
+                                profile[skill_id]["theta"] = float(proficiency - 3) * 0.5
+                                print(f"      ✅ Updated skill: {matched_skill.name} (level {proficiency})")
+                            else:
+                                print(f"      ℹ️  Skill already exists: {matched_skill.name} (current level {current_level})")
+                        matched_count += 1
                     else:
-                        # Update level if higher
-                        current_level = profile[skill_id].get("level", 0)
-                        if proficiency > current_level:
-                            profile[skill_id]["level"] = float(proficiency)
-                            profile[skill_id]["theta"] = float(proficiency - 3) * 0.5
-                    matched_count += 1
+                        print(f"      ⚠️  Failed to match or create skill: {skill_name}")
+                except Exception as skill_error:
+                    print(f"      ❌ Error processing skill {skill_name}: {skill_error}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
 
             # Update employee profile
-            emp.cognitive_profile = profile
-            self.db.add(emp)
-            self.db.commit()
-            self.db.refresh(emp)
+            if matched_count > 0:
+                emp.cognitive_profile = profile
+                self.db.add(emp)
+                self.db.commit()
+                self.db.refresh(emp)
+                print(f"✅ Successfully stored {matched_count} skill(s) in cognitive profile")
+            else:
+                print(f"⚠️  No skills were stored (matched_count: {matched_count})")
 
             return {
                 "extracted_skills": matched_count,
@@ -98,9 +125,13 @@ class EmployeeSkillService:
             }
 
         except Exception as e:
+            error_msg = f"Failed to extract skills: {str(e)}"
+            print(f"❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
             return {
                 "extracted_skills": 0,
-                "message": f"Failed to extract skills: {str(e)}",
+                "message": error_msg,
             }
 
     def _match_or_create_skill(self, skill_data: dict) -> Skill:

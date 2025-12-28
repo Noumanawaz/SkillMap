@@ -1,7 +1,7 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from datetime import date
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class AssessmentEvent(BaseModel):
@@ -28,6 +28,14 @@ class EmployeeCreate(BaseModel):
     hire_date: Optional[date] = None
     location: Optional[str] = None
 
+    @field_validator('hire_date', 'role_id', 'manager_id', mode='before')
+    @classmethod
+    def parse_optional_fields(cls, v):
+        """Convert empty string to None for optional fields."""
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class EmployeeUpdate(BaseModel):
     email: Optional[EmailStr] = None
@@ -37,6 +45,14 @@ class EmployeeUpdate(BaseModel):
     manager_id: Optional[str] = None
     hire_date: Optional[date] = None
     location: Optional[str] = None
+
+    @field_validator('hire_date', 'role_id', 'manager_id', mode='before')
+    @classmethod
+    def parse_optional_fields(cls, v):
+        """Convert empty string to None for optional fields."""
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class EmployeeOut(BaseModel):

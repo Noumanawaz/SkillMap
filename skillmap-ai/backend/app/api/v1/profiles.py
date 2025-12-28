@@ -64,10 +64,19 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
     if payload.description and payload.description.strip():
         try:
             skill_service = EmployeeSkillService(db)
-            skill_service.extract_and_store_skills(str(emp.employee_id), payload.description)
+            result = skill_service.extract_and_store_skills(str(emp.employee_id), payload.description)
+            # Log result for debugging
+            if result.get("extracted_skills", 0) == 0:
+                print(f"⚠️  Skill extraction for employee {emp.employee_id}: {result.get('message', 'Unknown error')}")
+                import traceback
+                traceback.print_exc()
+            else:
+                print(f"✅ Successfully extracted {result.get('extracted_skills')} skills for employee {emp.employee_id}")
         except Exception as e:
             # Log error but don't fail employee creation
-            print(f"Failed to extract skills for employee {emp.employee_id}: {e}")
+            print(f"❌ Failed to extract skills for employee {emp.employee_id}: {e}")
+            import traceback
+            traceback.print_exc()
     
     db.commit()
     db.refresh(emp)
@@ -138,11 +147,13 @@ def update_employee(
                     result = skill_service.extract_and_store_skills(str(emp.employee_id), payload.description)
                     # Log result for debugging
                     if result.get("extracted_skills", 0) == 0:
-                        print(f"Skill extraction result for {emp.employee_id}: {result.get('message', 'Unknown error')}")
+                        print(f"⚠️  Skill extraction for employee {emp.employee_id}: {result.get('message', 'Unknown error')}")
+                        import traceback
+                        traceback.print_exc()
                     else:
-                        print(f"Successfully extracted {result.get('extracted_skills')} skills for {emp.employee_id}")
+                        print(f"✅ Successfully extracted {result.get('extracted_skills')} skills for employee {emp.employee_id}")
                 except Exception as e:
-                    print(f"Failed to extract skills for employee {emp.employee_id}: {e}")
+                    print(f"❌ Failed to extract skills for employee {emp.employee_id}: {e}")
                     import traceback
                     traceback.print_exc()
     if payload.role_id is not None:
@@ -292,27 +303,43 @@ def extract_employee_skills(employee_id: str, db: Session = Depends(get_db)):
         )
     
     try:
+        print(f"🚀 Manual skill extraction triggered for employee {employee_id} ({emp.name})")
         skill_service = EmployeeSkillService(db)
         result = skill_service.extract_and_store_skills(str(emp.employee_id), emp.description)
         
-        if result.get("extracted_skills", 0) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=result.get("message", "Failed to extract skills. Please check OpenAI API key configuration.")
-            )
+        extracted_count = result.get("extracted_skills", 0)
+        message = result.get("message", "Unknown result")
         
+        if extracted_count == 0:
+            # Check if it's an API key issue
+            if "OpenAI API key" in message or "not configured" in message:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{message} Please set OPENAI_API_KEY in your environment variables."
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to extract skills: {message}"
+                )
+        
+        print(f"✅ Manual extraction successful: {extracted_count} skills extracted for {emp.name}")
         return {
             "employee_id": employee_id,
             "employee_name": emp.name,
-            "extracted_skills": result.get("extracted_skills", 0),
-            "message": result.get("message", "Skills extracted successfully"),
+            "extracted_skills": extracted_count,
+            "message": message,
         }
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = f"Failed to extract skills: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to extract skills: {str(e)}"
+            detail=error_msg
         )
 
 
