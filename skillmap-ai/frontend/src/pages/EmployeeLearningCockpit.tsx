@@ -88,7 +88,7 @@ export const EmployeeLearningCockpit: React.FC = () => {
     } catch (e: any) {
       const errorMsg = e.message || "Failed to generate learning path";
       if (errorMsg.includes("No skills") || errorMsg.includes("skills extracted")) {
-        setError(`${errorMsg}. Please extract skills for this goal first using the Strategy Dashboard.`);
+        setError(`${errorMsg}. Please extract skills for this goal first.`);
       } else {
         setError(errorMsg);
       }
@@ -198,21 +198,6 @@ export const EmployeeLearningCockpit: React.FC = () => {
 
           <div className="grid mb-3">
             <div>
-              <strong>Profile Similarity:</strong>{" "}
-              <span className="badge badge-primary">
-                {(path.meta.similarity * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div>
-              <strong>Gap Index:</strong>{" "}
-              <span className={`badge ${
-                path.meta.gap_index >= 2 ? "badge-danger" :
-                path.meta.gap_index >= 1 ? "badge-warning" : "badge-success"
-              }`}>
-                {path.meta.gap_index.toFixed(2)}
-              </span>
-            </div>
-            <div>
               <strong>Years to Goal:</strong>{" "}
               <span className="badge badge-info">
                 {path.meta.years_left?.toFixed(1) || "N/A"}
@@ -230,9 +215,9 @@ export const EmployeeLearningCockpit: React.FC = () => {
                   <p>{path.meta.message}</p>
                   {typeof path.meta.message === "string" &&
                     (path.meta.message as string).toLowerCase().includes("extract skills") && (
-                      <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
-                        Go to the Strategy Dashboard and click "Extract Skills" for this goal.
-                      </p>
+                  <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#666" }}>
+                    Please extract skills for this goal first.
+                  </p>
                     )}
                 </>
               ) : (

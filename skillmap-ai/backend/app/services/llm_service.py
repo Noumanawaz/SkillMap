@@ -80,6 +80,9 @@ class LLMService:
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Make a call to OpenAI API."""
+        import time
+        start_time = time.time()
+        
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -95,8 +98,30 @@ class LLMService:
         if response_format:
             kwargs["response_format"] = response_format
         
-        response = self.client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content
+        try:
+            print(f"      Making OpenAI API call...")
+            response = self.client.chat.completions.create(**kwargs)
+            elapsed = time.time() - start_time
+            print(f"      ✅ OpenAI API call completed in {elapsed:.2f}s")
+            return response.choices[0].message.content
+        except Exception as e:
+            elapsed = time.time() - start_time
+            error_str = str(e)
+            
+            # Check for quota errors
+            if "429" in error_str or "insufficient_quota" in error_str.lower() or "quota" in error_str.lower():
+                error_msg = "OpenAI API quota exceeded. Please check your OpenAI account billing and quota limits at https://platform.openai.com/account/billing"
+                print(f"      ❌ OpenAI API quota error after {elapsed:.2f}s")
+                print(f"      💡 {error_msg}")
+                raise ValueError(error_msg) from e
+            elif "401" in error_str or "unauthorized" in error_str.lower() or "invalid" in error_str.lower():
+                error_msg = "OpenAI API key is invalid or expired. Please check your API key at https://platform.openai.com/api-keys"
+                print(f"      ❌ OpenAI API authentication error after {elapsed:.2f}s")
+                print(f"      💡 {error_msg}")
+                raise ValueError(error_msg) from e
+            else:
+                print(f"      ❌ OpenAI API call failed after {elapsed:.2f}s: {e}")
+                raise
 
     def extract_strategic_goals(self, text: str, business_unit: Optional[str] = None) -> List[Dict[str, Any]]:
         """Extract strategic goals from strategy document text."""

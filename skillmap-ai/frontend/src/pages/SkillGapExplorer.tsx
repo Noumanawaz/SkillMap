@@ -110,12 +110,6 @@ export const SkillGapExplorer: React.FC = () => {
     return { label: "Low", class: "badge-success" };
   };
 
-  const getSimilarityColor = (sim: number) => {
-    if (sim >= 0.8) return "badge-success";
-    if (sim >= 0.6) return "badge-primary";
-    if (sim >= 0.4) return "badge-warning";
-    return "badge-danger";
-  };
 
   return (
     <div className="card">
@@ -167,7 +161,7 @@ export const SkillGapExplorer: React.FC = () => {
 
       {error && <div className="alert alert-error mt-2">{error}</div>}
 
-      {result && (
+          {result && (
         <div className="mt-3">
           {result.processing_info && (
             <div className="alert alert-info" style={{ marginBottom: "1rem", fontSize: "0.9rem" }}>
@@ -177,6 +171,170 @@ export const SkillGapExplorer: React.FC = () => {
               ({result.processing_info.critical_gaps || 0} critical).
               {result.processing_info.skills_extracted && " Skills were automatically extracted from the goal."}
               {result.processing_info.ai_analysis_used && " 🤖 AI-powered semantic analysis was used to identify skill relationships."}
+            </div>
+          )}
+
+          {/* Skills Summary Section */}
+          {result.scalar_gaps && Object.keys(result.scalar_gaps).length > 0 && (
+            <div className="card" style={{ marginBottom: "1.5rem", padding: "1.5rem" }}>
+              <h3 style={{ marginBottom: "1.5rem", color: "#333" }}>📋 Skills Overview</h3>
+              
+              {(() => {
+                const allSkills = Object.entries(result.scalar_gaps).map(([skillId, gap]) => {
+                  const skillName = result.skill_names?.[skillId] || skillId.substring(0, 8) + "...";
+                  const gapBreakdown = result.ai_insights?.gap_breakdown?.find(
+                    (g) => g.skill_name === skillName
+                  );
+                  const currentLevel = gapBreakdown?.current_level || 0;
+                  const requiredLevel = gapBreakdown?.required_level || 0;
+                  const hasGap = gap > 0.1; // Consider gap > 0.1 as significant
+                  
+                  return {
+                    skillId,
+                    skillName,
+                    gap,
+                    currentLevel,
+                    requiredLevel,
+                    hasGap,
+                    severity: gapBreakdown?.severity || (gap >= 3 ? "critical" : gap >= 2 ? "high" : gap >= 1 ? "moderate" : "low"),
+                  };
+                });
+
+                const presentSkills = allSkills.filter(s => !s.hasGap || s.gap < 0.1);
+                const missingSkills = allSkills.filter(s => s.hasGap && s.gap >= 0.1).sort((a, b) => b.gap - a.gap);
+
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem" }}>
+                    {/* Present Skills */}
+                    <div style={{ 
+                      padding: "1.5rem", 
+                      background: "linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)",
+                      borderRadius: "12px",
+                      border: "2px solid #4caf50"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", marginBottom: "1rem" }}>
+                        <span style={{ fontSize: "2rem", marginRight: "0.5rem" }}>✅</span>
+                        <h4 style={{ margin: 0, color: "#2e7d32", fontSize: "1.2rem", fontWeight: "700" }}>
+                          Skills Present ({presentSkills.length})
+                        </h4>
+                      </div>
+                      {presentSkills.length === 0 ? (
+                        <p style={{ color: "#666", fontStyle: "italic" }}>No skills currently meet the requirements.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          {presentSkills.map((skill) => (
+                            <div 
+                              key={skill.skillId}
+                              style={{
+                                padding: "0.75rem",
+                                background: "white",
+                                borderRadius: "8px",
+                                border: "1px solid #4caf50"
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                <strong style={{ color: "#2e7d32" }}>{skill.skillName}</strong>
+                                <span className="badge badge-success">Met</span>
+                              </div>
+                              <div style={{ fontSize: "0.85rem", color: "#666", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                                <div>
+                                  <strong>Current:</strong> {skill.currentLevel.toFixed(1)}/5.0
+                                </div>
+                                <div>
+                                  <strong>Required:</strong> {skill.requiredLevel.toFixed(1)}/5.0
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Missing Skills */}
+                    <div style={{ 
+                      padding: "1.5rem", 
+                      background: "linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)",
+                      borderRadius: "12px",
+                      border: "2px solid #f44336"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", marginBottom: "1rem" }}>
+                        <span style={{ fontSize: "2rem", marginRight: "0.5rem" }}>⚠️</span>
+                        <h4 style={{ margin: 0, color: "#c62828", fontSize: "1.2rem", fontWeight: "700" }}>
+                          Skills Missing ({missingSkills.length})
+                        </h4>
+                      </div>
+                      {missingSkills.length === 0 ? (
+                        <p style={{ color: "#666", fontStyle: "italic" }}>All required skills are present!</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                          {missingSkills.map((skill) => {
+                            const severityColors: Record<string, string> = {
+                              critical: "#c62828",
+                              high: "#f57c00",
+                              moderate: "#fbc02d",
+                              low: "#388e3c",
+                            };
+                            const severityLabels: Record<string, string> = {
+                              critical: "Critical",
+                              high: "High",
+                              moderate: "Moderate",
+                              low: "Low",
+                            };
+                            
+                            return (
+                              <div 
+                                key={skill.skillId}
+                                style={{
+                                  padding: "0.75rem",
+                                  background: "white",
+                                  borderRadius: "8px",
+                                  border: `2px solid ${severityColors[skill.severity] || "#ccc"}`
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                  <strong style={{ color: "#333" }}>{skill.skillName}</strong>
+                                  <span 
+                                    className="badge"
+                                    style={{
+                                      backgroundColor: severityColors[skill.severity] || "#ccc",
+                                      color: "white",
+                                      padding: "0.25rem 0.5rem",
+                                      borderRadius: "4px",
+                                      fontSize: "0.75rem",
+                                      textTransform: "uppercase",
+                                      fontWeight: "600"
+                                    }}
+                                  >
+                                    {severityLabels[skill.severity] || skill.severity}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: "0.85rem", color: "#666", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                                  <div>
+                                    <strong>Current:</strong> {skill.currentLevel.toFixed(1)}/5.0
+                                  </div>
+                                  <div>
+                                    <strong>Required:</strong> {skill.requiredLevel.toFixed(1)}/5.0
+                                  </div>
+                                </div>
+                                <div style={{ 
+                                  padding: "0.5rem", 
+                                  background: "#f5f5f5", 
+                                  borderRadius: "4px",
+                                  fontSize: "0.85rem"
+                                }}>
+                                  <strong style={{ color: severityColors[skill.severity] || "#000" }}>
+                                    Gap: {skill.gap.toFixed(1)}
+                                  </strong>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
           {result.ai_insights && (
@@ -282,34 +440,6 @@ export const SkillGapExplorer: React.FC = () => {
               )}
             </>
           )}
-          <div className="grid">
-            <div className="card" style={{ padding: "1.5rem" }}>
-              <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Profile Similarity</h3>
-              <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
-                <span className={`badge ${getSimilarityColor(result.similarity)}`} style={{ fontSize: "1.5rem", padding: "0.5rem 1rem" }}>
-                  {(result.similarity * 100).toFixed(1)}%
-                </span>
-              </div>
-              <p style={{ color: "#666", marginTop: "0.5rem", fontSize: "0.9rem" }}>
-                How well the employee's skill profile matches required skills (computed using semantic embeddings)
-              </p>
-            </div>
-            <div className="card" style={{ padding: "1.5rem" }}>
-              <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Gap Index</h3>
-              <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
-                <span className={`badge ${
-                  result.gap_index >= 2 ? "badge-danger" :
-                  result.gap_index >= 1 ? "badge-warning" :
-                  "badge-success"
-                }`} style={{ fontSize: "1.5rem", padding: "0.5rem 1rem" }}>
-                  {result.gap_index.toFixed(2)}
-                </span>
-              </div>
-              <p style={{ color: "#666", marginTop: "0.5rem", fontSize: "0.9rem" }}>
-                Overall gap severity (lower is better) - combines vector similarity and scalar gaps
-              </p>
-            </div>
-          </div>
 
           <h3 className="mt-3">3D Skill Gap Visualization</h3>
           {Object.keys(result.scalar_gaps).length === 0 ? (
@@ -321,8 +451,8 @@ export const SkillGapExplorer: React.FC = () => {
             <div style={{ marginTop: "1rem" }}>
               <SkillGap3D
                 gaps={Object.entries(result.scalar_gaps)
-                  .map(([sid, gap]) => {
-                    const severity = getGapSeverity(gap);
+                    .map(([sid, gap]) => {
+                      const severity = getGapSeverity(gap);
                     const skillName = result.skill_names?.[sid] || sid.substring(0, 8) + "...";
                     const gapBreakdown = result.ai_insights?.gap_breakdown?.find(
                       (g) => g.skill_name === skillName

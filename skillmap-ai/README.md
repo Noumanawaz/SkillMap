@@ -81,14 +81,15 @@ A production-ready AI system for strategic workforce planning and personalized l
 - **Modern Frontend**:
   - Beautiful, responsive UI
   - Real-time error handling
-  - Strategy dashboard, gap explorer, learning cockpit
+  - Gap explorer, learning cockpit, goal management
 
 ## 📋 API Endpoints
 
 ### Strategy
-- `POST /v1/strategy/ingest` - Ingest strategy document (extracts goals via LLM)
 - `GET /v1/strategy/goals` - List all strategic goals
-- `POST /v1/strategy/goals/{goal_id}/extract-skills` - Extract skills from goal (LLM)
+- `POST /v1/strategy/goals` - Create a strategic goal
+- `PUT /v1/strategy/goals/{goal_id}` - Update a strategic goal
+- `DELETE /v1/strategy/goals/{goal_id}` - Delete a strategic goal
 
 ### Skills
 - `POST /v1/skills` - Create skill in ontology
@@ -110,7 +111,6 @@ A production-ready AI system for strategic workforce planning and personalized l
 ## 🏗️ Architecture
 
 ### Backend (FastAPI)
-- **NLP Service**: Real OpenAI GPT-3.5 integration for goal extraction
 - **Skill Extraction Service**: LLM-based skill inference from goals
 - **LLM Service**: Centralized OpenAI client for all AI operations
 - **Cognitive Service**: IRT-based learner modeling
@@ -119,7 +119,7 @@ A production-ready AI system for strategic workforce planning and personalized l
 - **Vector Store**: Abstracted interface (in-memory by default, supports Pinecone/Weaviate)
 
 ### Frontend (React + Vite)
-- **Strategy Dashboard**: Ingest documents, view goals, extract skills
+- **Goal Management**: Create and manage strategic goals
 - **Skill Gap Explorer**: Analyze gaps with visual indicators
 - **Employee Learning Cockpit**: Generate and view personalized paths
 
@@ -174,12 +174,11 @@ The frontend uses:
 
 ## 📝 Example Workflow
 
-1. **Ingest Strategy**: Paste strategy document → AI extracts goals
-2. **Extract Skills**: Click "Extract Skills" on a goal → AI infers required skills
-3. **Create Employee**: Add employee profile via API
-4. **Update Cognitive Profile**: Submit assessments → IRT updates ability estimates
-5. **Analyze Gaps**: View gap analysis for employee vs goal
-6. **Generate Learning Path**: AI creates personalized path, generating content on-demand
+1. **Create Goals**: Add strategic goals via Goal Management page
+2. **Create Employee**: Add employee profile via Employee Management page
+3. **Update Cognitive Profile**: Submit assessments → IRT updates ability estimates
+4. **Analyze Gaps**: View gap analysis for employee vs goal
+5. **Generate Learning Path**: AI creates personalized path, generating content on-demand
 
 ## 🚧 Future Enhancements
 

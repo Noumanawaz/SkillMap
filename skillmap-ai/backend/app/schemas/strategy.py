@@ -4,12 +4,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class StrategyIngestRequest(BaseModel):
-    raw_text: str
-    source_name: str
-    business_unit: Optional[str] = None
-
-
 class StrategicGoalCreate(BaseModel):
     title: str
     description: Optional[str] = None

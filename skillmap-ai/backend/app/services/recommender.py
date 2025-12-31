@@ -32,12 +32,17 @@ class RecommenderService:
         if not goal:
             raise ValueError("Goal not found")
 
+        # Access goal attributes before any operations that might cause rollback
+        goal_time_horizon = goal.time_horizon_year
+        current_year = datetime.utcnow().year
+        years_left = max(0.5, (goal_time_horizon or current_year + 3) - current_year) if goal_time_horizon else None
+
         gaps = self.gap_engine.gaps_for_employee(employee_id, goal_id)
         scalar_gaps = gaps.get("scalar_gaps", {})
         
         # If no skills extracted, return empty path with message
         if not scalar_gaps:
-            error_message = gaps.get("message", "No skills extracted for this goal. Please extract skills first using the Strategy Dashboard.")
+            error_message = gaps.get("message", "No skills extracted for this goal. Please extract skills first.")
             return {
                 "employee_id": employee_id,
                 "goal_id": goal_id,
@@ -47,12 +52,9 @@ class RecommenderService:
                     "similarity": gaps.get("similarity", 0.0),
                     "gap_index": gaps.get("gap_index", 0.0),
                     "message": error_message,
-                    "years_left": max(0.5, (goal.time_horizon_year or datetime.utcnow().year + 3) - datetime.utcnow().year) if goal.time_horizon_year else None,
+                    "years_left": years_left,
                 },
             }
-
-        current_year = datetime.utcnow().year
-        years_left = max(0.5, (goal.time_horizon_year or current_year + 3) - current_year)
 
         skills_sorted = sorted(
             scalar_gaps.items(), key=lambda kv: kv[1], reverse=True

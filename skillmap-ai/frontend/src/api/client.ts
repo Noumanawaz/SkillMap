@@ -11,10 +11,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
     let errorMessage = `Request failed: ${res.status}`;
     // Try to parse as JSON for structured error messages
     if (text) {
-      try {
+    try {
         const errorData = JSON.parse(text);
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } catch {
+      errorMessage = errorData.detail || errorData.message || errorMessage;
+    } catch {
         // If not JSON, use the text as error message
         errorMessage = text || errorMessage;
       }

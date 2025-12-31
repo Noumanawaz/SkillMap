@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StrategyDashboard } from "./pages/StrategyDashboard";
+import { LandingPage } from "./pages/LandingPage";
 import { SkillGapExplorer } from "./pages/SkillGapExplorer";
 import { EmployeeLearningCockpit } from "./pages/EmployeeLearningCockpit";
 import { EmployeeManagement } from "./pages/EmployeeManagement";
@@ -7,10 +7,10 @@ import { GoalManagement } from "./pages/GoalManagement";
 import { SkillAssessment } from "./pages/SkillAssessment";
 import "./App.css";
 
-type Page = "strategy" | "gaps" | "learning" | "employees" | "goals" | "assessment";
+type Page = "home" | "gaps" | "learning" | "employees" | "goals" | "assessment";
 
 const App: React.FC = () => {
-  const [page, setPage] = useState<Page>("strategy");
+  const [page, setPage] = useState<Page>("home");
 
   // Listen for navigation events from child components
   React.useEffect(() => {
@@ -34,10 +34,10 @@ const App: React.FC = () => {
       </header>
       <nav className="app-nav">
         <button
-          className={page === "strategy" ? "active" : ""}
-          onClick={() => setPage("strategy")}
+          className={page === "home" ? "active" : ""}
+          onClick={() => setPage("home")}
         >
-          📊 Strategy Dashboard
+          🏠 Home
         </button>
         <button
           className={page === "gaps" ? "active" : ""}
@@ -70,8 +70,8 @@ const App: React.FC = () => {
           📝 Skill Assessment
         </button>
       </nav>
-      <main className="app-main">
-        {page === "strategy" && <StrategyDashboard />}
+      <main className={`app-main ${page === "home" ? "landing-main" : ""}`}>
+        {page === "home" && <LandingPage />}
         {page === "gaps" && <SkillGapExplorer />}
         {page === "learning" && <EmployeeLearningCockpit />}
         {page === "employees" && <EmployeeManagement />}
