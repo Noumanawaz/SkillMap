@@ -23,13 +23,13 @@ class GapEngine:
             import os
 
             settings = get_settings()
-            api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+            api_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
 
-            if api_key and api_key.startswith("sk-"):
+            if api_key:
                 self.llm = LLMService()
                 print("✅ LLM initialized")
             else:
-                print("⚠️ OpenAI API key missing or invalid")
+                print("⚠️ Gemini API key missing or invalid")
 
         except Exception as e:
             print(f"❌ LLM init failed: {e}")
@@ -157,6 +157,7 @@ class GapEngine:
             }
 
         try:
+            user_email = emp.email if emp else None
             ai_gap_analysis = self.llm.analyze_skill_gaps(
                 employee_skills_for_ai,
                 required_skills_for_ai,
@@ -164,8 +165,12 @@ class GapEngine:
                 goal.description or "",
                 emp.name,
                 emp.description or "",
+                user_email=user_email
             )
+            # DEBUG
+            # print(f"DEBUG: AI Gap Analysis: {json.dumps(ai_gap_analysis, indent=2)}")
         except Exception as e:
+            print(f"AI gap analysis failed: {e}")
             return {
                 "employee_id": employee_id,
                 "goal_id": goal_id,
@@ -176,20 +181,32 @@ class GapEngine:
         scalar_gaps = {}
 
         for match in ai_gap_analysis.get("skill_matches", []):
+            match_name = match.get("required_skill") or match.get("skill") or match.get("name")
+            matched = False
             for rs in req_skills:
                 skill = self.db.get(Skill, rs.skill_id)
-                if skill and skill.name == match.get("required_skill"):
+                if skill and match_name and skill.name.lower().strip() == match_name.lower().strip():
                     sid = str(rs.skill_id)
                     gap = float(match.get("gap_value", 0.0))
                     scalar_gaps[sid] = max(0.0, gap)
                     current_levels[sid] = max(0.0, required_levels[sid] - gap)
+                    matched = True
+                    break
+            if not matched:
+                print(f"      ⚠️ No DB match found for AI skill match: '{match_name}'")
 
         for missing in ai_gap_analysis.get("missing_skills", []):
+            missing_name = missing.get("required_skill") or missing.get("skill") or missing.get("name")
+            matched = False
             for rs in req_skills:
                 skill = self.db.get(Skill, rs.skill_id)
-                if skill and skill.name == missing.get("required_skill"):
+                if skill and missing_name and skill.name.lower().strip() == missing_name.lower().strip():
                     sid = str(rs.skill_id)
                     scalar_gaps[sid] = float(missing.get("gap_value", required_levels[sid]))
+                    matched = True
+                    break
+            if not matched:
+                print(f"      ⚠️ No DB match found for AI missing skill: '{missing_name}'")
 
         emp_vec = self._bundle_embedding(skill_ids, [current_levels[sid] for sid in skill_ids])
         req_vec = self._bundle_embedding(skill_ids, weights)

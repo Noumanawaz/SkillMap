@@ -40,6 +40,66 @@ class AssessmentService:
         Generate a dynamic MCQ test for a skill.
         Difficulty is based on readiness_score (0-1) or defaults to moderate.
         """
+        # Get employee for demo mode check
+        emp = self.db.get(EmployeeProfile, UUID(employee_id))
+        if not emp:
+            raise ValueError(f"Employee {employee_id} not found")
+        
+        user_email = emp.email if emp else None
+        
+        # Check for demo mode
+        from app.core.config import get_settings
+        settings = get_settings()
+        is_demo = False
+        if settings.demo_mode:
+            if settings.demo_user_email:
+                is_demo = user_email == settings.demo_user_email
+            else:
+                is_demo = True
+        
+        if is_demo and self.llm:
+            print("🎬 DEMO MODE: Using mock assessment")
+            # Get skill info if not provided
+            if not skill_name or not skill_description:
+                skill = self.db.get(Skill, UUID(skill_id))
+                if not skill:
+                    raise ValueError(f"Skill {skill_id} not found")
+                skill_name = skill.name
+                skill_description = skill.description or ""
+            
+            demo_data = self.llm._get_demo_assessment(skill_name, num_questions)
+            questions = demo_data.get("questions", [])
+            avg_difficulty = demo_data.get("average_difficulty", 2.5)
+            
+            # Determine readiness score
+            if readiness_score is None:
+                cognitive_profile = emp.cognitive_profile or {}
+                skill_data = cognitive_profile.get(skill_id, {})
+                current_theta = skill_data.get("theta", 0.0)
+                readiness_score = max(0.0, min(1.0, (current_theta + 3) / 6))
+            
+            # Create assessment record
+            assessment = SkillAssessment(
+                employee_id=UUID(employee_id),
+                skill_id=UUID(skill_id),
+                questions=questions,
+                difficulty_level=avg_difficulty,
+                readiness_score=readiness_score,
+                status="pending",
+            )
+            self.db.add(assessment)
+            self.db.commit()
+            self.db.refresh(assessment)
+            
+            return {
+                "assessment_id": str(assessment.assessment_id),
+                "skill_id": skill_id,
+                "skill_name": skill_name,
+                "questions": questions,
+                "difficulty_level": avg_difficulty,
+                "estimated_duration_minutes": len(questions) * 1.5,
+            }
+
         if not self.llm:
             raise ValueError("LLM service is required for dynamic test generation")
 
@@ -54,11 +114,6 @@ class AssessmentService:
         # Determine difficulty based on readiness score
         # readiness_score 0-1 maps to difficulty 1-5
         if readiness_score is None:
-            # Check employee's current proficiency
-            emp = self.db.get(EmployeeProfile, UUID(employee_id))
-            if not emp:
-                raise ValueError(f"Employee {employee_id} not found")
-            
             cognitive_profile = emp.cognitive_profile or {}
             skill_data = cognitive_profile.get(skill_id, {})
             current_theta = skill_data.get("theta", 0.0)
@@ -127,27 +182,12 @@ CRITICAL: Ensure ALL questions are UNIQUE and NON-REPETITIVE. Return ONLY valid 
                 response_format={"type": "json_object"}
             )
             
-            # Clean response
-            response = re.sub(r"```json\s*", "", response)
-            response = re.sub(r"```\s*", "", response)
-            response = response.strip()
+            # Use the new cleaning helper from LLMService
+            parsed = self.llm._clean_and_parse_json(response)
             
-            # Find JSON object
-            if "{" in response:
-                start = response.index("{")
-                brace_count = 0
-                end = start
-                for i in range(start, len(response)):
-                    if response[i] == "{":
-                        brace_count += 1
-                    elif response[i] == "}":
-                        brace_count -= 1
-                        if brace_count == 0:
-                            end = i + 1
-                            break
-                response = response[start:end]
-            
-            parsed = json.loads(response)
+            if not parsed:
+                raise ValueError("Failed to parse assessment JSON from AI")
+                
             questions = parsed.get("questions", [])
             avg_difficulty = parsed.get("average_difficulty", base_difficulty)
             
@@ -163,6 +203,9 @@ CRITICAL: Ensure ALL questions are UNIQUE and NON-REPETITIVE. Return ONLY valid 
             if len(unique_questions) < num_questions:
                 print(f"⚠️  Generated {len(unique_questions)} unique questions, requested {num_questions}")
             
+            if not unique_questions:
+                raise ValueError("AI generated no unique questions for assessment")
+
             # Create assessment record
             assessment = SkillAssessment(
                 employee_id=UUID(employee_id),
@@ -184,14 +227,11 @@ CRITICAL: Ensure ALL questions are UNIQUE and NON-REPETITIVE. Return ONLY valid 
                 "difficulty_level": avg_difficulty,
                 "estimated_duration_minutes": len(unique_questions) * 1.5,  # ~1.5 min per question
             }
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing failed in assessment generation: {e}")
-            raise ValueError(f"Failed to generate assessment: Invalid JSON response from AI")
         except Exception as e:
             print(f"Assessment generation failed: {e}")
             import traceback
             traceback.print_exc()
-            raise
+            raise ValueError(f"Failed to generate assessment: {str(e)}")
 
     def submit_assessment(
         self,

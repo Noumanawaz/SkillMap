@@ -71,6 +71,15 @@ class RecommenderService:
         iterations_without_progress = 0
         max_iterations = len(skills_sorted) * 10  # Safety limit to prevent infinite loops
         
+        # Track generated modules per skill to prevent repetition
+        skill_module_counts = {}
+        for skill_id, gap in scalar_gaps.items():
+            # Estimate total modules needed (gap / 0.5)
+            skill_module_counts[skill_id] = {
+                "current": 0,
+                "total": max(1, int(gap / 0.5))
+            }
+
         iteration = 0
         while total_minutes < max_hours_minutes and iteration < max_iterations:
             iteration += 1
@@ -110,7 +119,19 @@ class RecommenderService:
             if not modules and self.llm:
                 skill = self.db.get(Skill, UUID(skill_id))
                 if skill:
-                    module = self._generate_module_for_skill(skill, target_level, theta, profile)
+                    # Increment current module index for this skill
+                    counts = skill_module_counts.get(skill_id, {"current": 0, "total": 1})
+                    counts["current"] += 1
+                    
+                    module = self._generate_module_for_skill(
+                        skill, 
+                        target_level, 
+                        theta, 
+                        profile, 
+                        employee_id,
+                        module_index=counts["current"],
+                        total_modules=counts["total"]
+                    )
                     if module and str(module.module_id) not in added_module_ids:
                         modules = [module]
 
@@ -217,13 +238,29 @@ class RecommenderService:
         }
 
     def _generate_module_for_skill(
-        self, skill: Skill, target_level: int, theta: float, profile: Dict
+        self, 
+        skill: Skill, 
+        target_level: int, 
+        theta: float, 
+        profile: Dict, 
+        employee_id: Optional[str] = None,
+        module_index: int = 1,
+        total_modules: int = 1
     ) -> Optional[LearningModule]:
         """Generate a learning module on-demand using LLM."""
         if not self.llm:
             return None
 
         try:
+            # Get employee email for demo mode
+            user_email = None
+            if employee_id:
+                try:
+                    emp = self.db.get(EmployeeProfile, UUID(employee_id))
+                    user_email = emp.email if emp else None
+                except:
+                    pass
+            
             # Determine learning style from profile (simple heuristic)
             learning_style = profile.get("learning_style", "balanced")
             
@@ -234,6 +271,9 @@ class RecommenderService:
                 target_level,
                 theta,
                 learning_style,
+                module_index=module_index,
+                total_modules=total_modules,
+                user_email=user_email
             )
 
             # Calculate realistic duration based on content, exercises, and target level

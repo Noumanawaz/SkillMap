@@ -20,11 +20,10 @@ class Settings(BaseSettings):
     # Database (supports PostgreSQL or SQLite)
     database_url: str = "sqlite:///./skillmap.db"  # Default to SQLite for easy setup
     
-    # OpenAI
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-3.5-turbo"
-    openai_temperature: float = 0.7
-    openai_max_tokens: int = 2000
+    # Gemini
+    gemini_api_key: Optional[str] = None
+    gemini_model: str = "gemini-2.0-flash"
+
     
     # Vector DB
     vector_db_backend: str = "in_memory"  # in_memory, pinecone, weaviate
@@ -39,6 +38,10 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/v1"
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
     
+    # Demo Mode
+    demo_mode: bool = False
+    demo_user_email: Optional[str] = None  # If set, this user gets demo responses
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -48,18 +51,31 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Also check environment variables directly as fallback (for Coolify/Docker deployments)
-        if not self.openai_api_key:
-            self.openai_api_key = os.getenv("OPENAI_API_KEY")
-            if self.openai_api_key:
-                print(f"✅ OPENAI_API_KEY loaded from environment variable")
+        if not self.gemini_api_key:
+            self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+            if self.gemini_api_key:
+                print(f"✅ GEMINI_API_KEY loaded from environment variable")
             else:
-                print(f"⚠️  OPENAI_API_KEY not found in environment variables")
+                print(f"⚠️  GEMINI_API_KEY not found in environment variables")
                 # Debug: show what env vars are available (without exposing values)
-                openai_vars = [k for k in os.environ.keys() if 'OPENAI' in k.upper() or 'AI' in k.upper()]
-                if openai_vars:
-                    print(f"   Found related env vars: {', '.join(openai_vars)}")
+                gemini_vars = [k for k in os.environ.keys() if 'GEMINI' in k.upper() or 'AI' in k.upper()]
+                if gemini_vars:
+                    print(f"   Found related env vars: {', '.join(gemini_vars)}")
                 else:
-                    print(f"   No OpenAI-related environment variables found")
+                    print(f"   No Gemini-related environment variables found")
+        
+        # Check for demo mode
+        if not self.demo_mode:
+            demo_mode_env = os.getenv("DEMO_MODE", "false").lower()
+            self.demo_mode = demo_mode_env == "true"
+        if not self.demo_user_email:
+            self.demo_user_email = os.getenv("DEMO_USER_EMAIL")
+        
+        if self.demo_mode:
+            if self.demo_user_email:
+                print(f"🎬 DEMO MODE enabled for user: {self.demo_user_email}")
+            else:
+                print(f"🎬 DEMO MODE enabled for all users")
 
 
 # Don't cache settings to ensure .env changes are picked up

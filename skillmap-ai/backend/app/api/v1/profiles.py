@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.db.models import EmployeeProfile
+from app.db.models import EmployeeProfile, SkillAssessment, StrategicGoal
 from app.db.session import get_db
 from app.schemas.profiles import (
     CognitiveUpdateRequest,
@@ -54,16 +54,22 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
         location=payload.location,
     )
     db.add(emp)
-    db.flush()
+    db.flush()  # Flush to get employee_id, but don't commit yet
 
     if payload.description and payload.description.strip():
         try:
             skill_service = EmployeeSkillService(db)
-            skill_service.extract_and_store_skills(str(emp.employee_id), payload.description)
+            result = skill_service.extract_and_store_skills(str(emp.employee_id), payload.description)
+            if result.get("extracted_skills", 0) == 0:
+                print(f"⚠️ No skills extracted for employee {emp.employee_id}: {result.get('message', 'Unknown error')}")
+            else:
+                print(f"✅ Extracted {result.get('extracted_skills', 0)} skills for employee {emp.employee_id}")
         except Exception as e:
-            print(f"⚠️ Skill extraction failed for employee {emp.employee_id}: {e}")
+            import traceback
+            print(f"❌ Skill extraction failed for employee {emp.employee_id}: {e}")
+            traceback.print_exc()
 
-    db.commit()
+    db.commit()  # Commit everything together (employee + cognitive_profile)
     db.refresh(emp)
 
     return EmployeeOut(
@@ -169,3 +175,78 @@ def get_employee_skills(employee_id: str, db: Session = Depends(get_db)):
         "skills_in_ontology": len(skills_list),
         "skills_missing_from_ontology": len(missing_skills),
     }
+
+
+@router.put("/{employee_id}", response_model=EmployeeOut)
+def update_profile(employee_id: str, payload: EmployeeUpdate, db: Session = Depends(get_db)):
+    try:
+        emp = db.get(EmployeeProfile, UUID(employee_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid employee ID")
+
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    
+    # Handle UUID conversions for optional fields
+    for field in ["role_id", "manager_id"]:
+        if field in update_data and update_data[field]:
+            update_data[field] = UUID(update_data[field])
+
+    for field, value in update_data.items():
+        setattr(emp, field, value)
+
+    db.add(emp)
+    db.commit()
+    db.refresh(emp)
+
+    return EmployeeOut(
+        employee_id=str(emp.employee_id),
+        email=emp.email,
+        name=emp.name,
+        description=emp.description,
+        role_id=str(emp.role_id) if emp.role_id else None,
+        manager_id=str(emp.manager_id) if emp.manager_id else None,
+        hire_date=emp.hire_date,
+        location=emp.location,
+        created_at=emp.created_at.isoformat() if emp.created_at else None,
+    )
+
+
+@router.delete("/{employee_id}")
+def delete_profile(employee_id: str, db: Session = Depends(get_db)):
+    try:
+        emp_uuid = UUID(employee_id)
+        emp = db.get(EmployeeProfile, emp_uuid)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid employee ID")
+
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    try:
+        # 1. Handle subordinates: reassign or set manager_id to None
+        subordinates = db.query(EmployeeProfile).filter(EmployeeProfile.manager_id == emp_uuid).all()
+        for sub in subordinates:
+            sub.manager_id = None
+            db.add(sub)
+
+        # 2. Delete skill assessments associated with this employee
+        db.query(SkillAssessment).filter(SkillAssessment.employee_id == emp_uuid).delete()
+
+        # 3. Handle owned strategic goals: set owner_employee_id to None
+        owned_goals = db.query(StrategicGoal).filter(StrategicGoal.owner_employee_id == emp_uuid).all()
+        for goal in owned_goals:
+            goal.owner_employee_id = None
+            db.add(goal)
+
+        # 4. Finally delete the employee profile
+        db.delete(emp)
+        db.commit()
+        
+        return {"status": "success", "message": f"Employee {employee_id} deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error during employee deletion: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete employee: {str(e)}")
