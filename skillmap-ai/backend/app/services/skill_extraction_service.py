@@ -51,10 +51,18 @@ class SkillExtractionService:
         ]
 
         try:
+            # Get owner email if available for demo mode
+            user_email = None
+            if goal.owner_employee_id:
+                from app.db.models import EmployeeProfile
+                owner = self.db.get(EmployeeProfile, goal.owner_employee_id)
+                user_email = owner.email if owner else None
+            
             extracted = self.llm.extract_skills_from_goal(
                 goal.title,
                 goal.description or "",
                 skills_context,
+                user_email=user_email
             )
         except Exception as e:
             raise ValueError(f"Skill extraction failed: {str(e)}")
